@@ -9,51 +9,79 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warnings=FALSE)
 ```
 
-## Research question: What are the trends in the number of methadone prescriptions in Scotland over the past 10 years and how do they vary with the number of heroin-related (due to overdose) hospital stays (in general acute and psychiatric hospitals; as an indicator of heroin addiction prevalence in the population) over the same period?
+# Research question: 
+What are the trends in the number of methadone prescriptions in Scotland between financial year 2016/17 to 2022/23 and how do they vary with the number of opioid-related hospital stays over the same period?
+
+# NOTES:
+- Opioid-related hospital stays are a combination of hospitalisatiosn due to overdose and mental and behavioural disorders, I use this as an indicator of opioid addiction prevalence in the population.
+- Hopsital stays refers to hospitalisations in general acute and psychiatric hospitals.
+- An individual patient can have multiple hospital stays in a year across the two different hospitals (general acute and psychiatric).
+
+# TO DO:
+- Make a graph of the change in opioid-related hospital stays over time (from financial year 2016/17 to 2022/23) for each health board in Scotland.
+- Download the population for each health board over time data at then in your graph do proportions of the population changes over time rather than the raw numbers.
+- Do the big download thing (downloading multiple datasets at a time, shown to you in previous workshop) and then create function to concatenate all the monthly data into financial year data (think this is from April to April)
+- Read this: https://www.gov.scot/publications/evidence-review-opioid-substitution-therapy-ost-implicated-deaths-prescribing-scotland/pages/2/
+- This is the geospatial stuff, you were thinking of doing something like deviations from mean and the plotting it like red is increase and blue is decrease
 
 ```{r, include=FALSE}
-
 library(tidyverse)
 library(here)
 library(janitor)
 library(sf)
-
 ```
 
-Load NHS Scotland health board name data, health board geospatial data, and opioid-related hospital stays data.
+Load NHS Scotland opioid-related hospital stays data.
 ```{r}
-
-healthboard_names_and_spatial_data <- st_read(here("data", "health_board_spatial_data", "NHS_healthboards_2019.shp")) %>%
+opioid_related_hospital_statistics <- read_csv(here("data", "opioid_related_hospital_statistics.csv")) %>%
   # Clean column names for consistency
   clean_names() %>% 
-  # Rename column for clarity 
-  rename(hb_geometry = geometry) %>%
-  # Add "NHS" prefix to every entry in the hb_name column (the health board names) and change " and " to " & "
-  mutate(hb_name = str_replace(paste0("NHS ", hb_name), " and ", " & "))
-
-drug_related_hospital_statistics <- read_csv(here("data", "drug_related_hospital_statistics.csv")) %>% 
-  clean_names() %>% 
   # Rename columns for clarity and consistency
-  rename(hb_name = location, overdose_hospital_stays = value) 
-  
+  rename(hb_name = location, overdose_hospital_stays = value) %>%
+  # Remove "NHS" prefix from every entry in the hb_name column (the health board names) for clarity and consistency
+  mutate(hb_name = str_replace(hb_name, "^NHS ", ""))
 ```
 
-Join the health board names and spatial data with the opioid-related hospital stays data.
+Load NHS health board names and spatial data.
 ```{r}
+healthboard_names_and_spatial_data <- st_read(here("data", "health_board_spatial_data", "NHS_healthboards_2019.shp")) %>%
+  clean_names() %>% 
+  # Rename column for clarity 
+  rename(hb_geometry = geometry) %>% 
+  # Change "and" to "&" in the health board names for consistency
+  mutate(hb_name = str_replace(hb_name, " and ", " & "))
+```
 
-drug_related_hospital_statistics <- drug_related_hospital_statistics %>%
+Join together the opioid-related hospital stays data, health board names and spatial data, and health board population data.
+```{r}
+joined <- opioid_related_hospital_statistics %>%
   full_join(healthboard_names_and_spatial_data, join_by("hb_name")) %>%
   # Select relevant columns
   select(financial_year, hb_name, hb_code, drug_type, overdose_hospital_stays, hb_geometry)
+```
 
-drug_related_hospital_statistics %>% 
-  filter(drug_type == "Heroin") %>%
+Visualise the number of opioid-related hospital stays, as a proportion of the health board population, over time for each health board in Scotland.
+```{r}
+joined %>% 
   ggplot(aes(fill = overdose_hospital_stays)) +
   geom_sf(aes(geometry = hb_geometry)) +
   scale_fill_distiller(palette = "Spectral") +
-  labs(title = "Number of Heroin-Related Hospital Stays\n Caused by Overdose across Health Boards") + 
-   theme_void() 
+  labs(title = "Number of Opioid-Related Hospital Stays Across Health Boards in the Past 7 Years") + 
+   theme_void() + 
+  facet_wrap(~financial_year)
+```
+
+
+
+```{r, include = FALSE}
+
+opioid_related_hospital_statistics %>% 
+  ggplot(aes(x = financial_year, y = overdose_hospital_stays)) +
+  geom_boxplot() +
+  facet_wrap(~hb_name)
+
+
+opioid_related_hospital_statistics %>% filter(hb_name %in% c("NHS Orkney", "NHS Shetland", "NHS Western Isles", "NHS Highland")) %>% view()
 
 ```
-## do the big download thing and then create function to concatenate all the monthly data into yearly data
 
