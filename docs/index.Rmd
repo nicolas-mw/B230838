@@ -1,28 +1,36 @@
 ---
-title: "R Programming Assignment"
+title: "R Programming Formative Assignment"
 author: "Nicolas Martinez-Wise"
 date: ""
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warnings=FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warnings = FALSE)
 ```
 
 # Research question: 
-What are the trends in the number of methadone prescriptions in Scotland between financial year 2016/17 to 2022/23 and how do they vary with the number of opioid-related hospital stays over the same period?
+What are the trends in the number of methadone prescriptions across health boards in Scotland between the financial years 2016/17 and 2022/23? How do these trends vary with the number of opioid-related hospital stays over the same period?
 
-# NOTES:
-- Opioid-related hospital stays are a combination of hospitalisatiosn due to overdose and mental and behavioural disorders, I use this as an indicator of opioid addiction prevalence in the population.
-- Hopsital stays refers to hospitalisations in general acute and psychiatric hospitals.
-- An individual patient can have multiple hospital stays in a year across the two different hospitals (general acute and psychiatric).
+- Opioid-related hospital stays are hospitalisations due to opioid overdose and opioid-related mental and behavioural disorders across general acute and psychiatric hospitals in Scotland. I will use the number of opioid-related hospital stays as an indicator of opioid addiction prevalence and severity in the population.
+- Methadone is a medication used in opioid substitution therapy (OST) to treat opioid addiction. I will use the number of methadone prescriptions as an indicator of the number of individuals receiving OST for opioid addiction. However, I understand that methadone is also used to treat chronic pain, so I will need to consider this when interpreting the results.
 
-# TO DO:
-- Make a graph of the change in opioid-related hospital stays over time (from financial year 2016/17 to 2022/23) for each health board in Scotland.
-- Download the population for each health board over time data at then in your graph do proportions of the population changes over time rather than the raw numbers.
-- Do the big download thing (downloading multiple datasets at a time, shown to you in previous workshop) and then create function to concatenate all the monthly data into financial year data (think this is from April to April)
-- Read this: https://www.gov.scot/publications/evidence-review-opioid-substitution-therapy-ost-implicated-deaths-prescribing-scotland/pages/2/
-- This is the geospatial stuff, you were thinking of doing something like deviations from mean and the plotting it like red is increase and blue is decrease
+- I expect that the number of methadone prescriptions will increase over time as the number of opioid-related hospital stays decreases. 
+
+
+```{r, include=FALSE}
+## NOTES: 
+#- An individual patient can have multiple hospital stays in a year across the two types of hospitals (general acute and psychiatric).
+
+## TO DO:
+#- Make a graph of the change in opioid-related hospital stays over time (from financial year 2016/17 to 2022/23) for each health board in Scotland.
+#- Download the population for each health board over time data at then in your graph do proportions of the population changes over time rather than the raw numbers.
+#- Do the big download thing (downloading multiple datasets at a time, shown to you in previous workshop) and then create function to concatenate all the monthly data into financial year data (think this is from April to April)
+#- Read this: https://www.gov.scot/publications/evidence-review-opioid-substitution-therapy-ost-implicated-deaths-prescribing-scotland/pages/2/
+#- This is the geospatial stuff, you were thinking of doing something like deviations from mean and the plotting it like red is increase and blue is decrease
+```
+
+
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -31,8 +39,9 @@ library(janitor)
 library(sf)
 ```
 
-Load NHS Scotland opioid-related hospital stays data.
-```{r}
+```{r, include=FALSE}
+#Load NHS Scotland opioid-related hospital stays data.
+
 opioid_related_hospital_statistics <- read_csv(here("data", "opioid_related_hospital_statistics.csv")) %>%
   # Clean column names for consistency
   clean_names() %>% 
@@ -42,8 +51,9 @@ opioid_related_hospital_statistics <- read_csv(here("data", "opioid_related_hosp
   mutate(hb_name = str_replace(hb_name, "^NHS ", ""))
 ```
 
-Load NHS health board names and spatial data.
-```{r}
+```{r, results = 'hide', include=FALSE}
+#Load NHS health board names and spatial data.
+
 healthboard_names_and_spatial_data <- st_read(here("data", "health_board_spatial_data", "NHS_healthboards_2019.shp")) %>%
   clean_names() %>% 
   # Rename column for clarity 
@@ -52,34 +62,50 @@ healthboard_names_and_spatial_data <- st_read(here("data", "health_board_spatial
   mutate(hb_name = str_replace(hb_name, " and ", " & "))
 ```
 
-Join together the opioid-related hospital stays data, health board names and spatial data, and health board population data.
-```{r}
+```{r, include=FALSE}
+#Join together the opioid-related hospital stays data, health board names and spatial data, and health board population data.
+
+
 joined <- opioid_related_hospital_statistics %>%
   full_join(healthboard_names_and_spatial_data, join_by("hb_name")) %>%
   # Select relevant columns
   select(financial_year, hb_name, hb_code, drug_type, overdose_hospital_stays, hb_geometry)
 ```
 
-Visualise the number of opioid-related hospital stays, as a proportion of the health board population, over time for each health board in Scotland.
-```{r}
+
+```{r visualization, echo=FALSE}
+#Visualise the number of opioid-related hospital stays, as a proportion of the health board population, over time for each health board in Scotland.
+
 joined %>% 
   ggplot(aes(fill = overdose_hospital_stays)) +
   geom_sf(aes(geometry = hb_geometry)) +
   scale_fill_distiller(palette = "Spectral") +
-  labs(title = "Number of Opioid-Related Hospital Stays Across Health Boards in the Past 7 Years") + 
+  labs(title = "Number of Opioid-Related Hospital Stays Across Health Boards\nOver Time") + 
    theme_void() + 
   facet_wrap(~financial_year)
 ```
+
+This visualisation depicts the number of opioid-related hospital stays across health boards between the financial years 2016/17 and 2022/23. The visualisation shows that the number of opioid-related hospital stays has varied across health boards and over time.
+
+# Next Steps:
+- I will calculcate proportions of the population when comparing across health boards and over time, rather than number used in the visualisation above. 
+- I will download the prescription data for financial years 2016/17 and 2022/23 and explore methadone prescription trends across health boards and over time. I will try to create a visualisation of how the number of methadone prescriptions and opioid-related hospital stays have changed over time for each health board, but I am not yet sure of the best way to visualise these datasets together.
+- I might separate opioid-related hospital stays into those due to overdose or mental and behavioural disorders. This could give a more in depth indication of how different manifestations of opioid addiction have changed across health boards and over time. I was wondering whether I could use this alongside some additional mental health data, but I am not sure how I would go about this.
+- I might also look at naloxalone and buprenorphine prescriptions in addition to methadone. This could give a better estimation of the number of individuals receiving treatment for opioid addiction.
 
 
 
 ```{r, include = FALSE}
 
+council_area <- read_csv(here("data", "council_area.csv"))
+
+table_data_3 <- read_csv(here("data", "table_data-3.csv"))
+
+
 opioid_related_hospital_statistics %>% 
   ggplot(aes(x = financial_year, y = overdose_hospital_stays)) +
   geom_boxplot() +
   facet_wrap(~hb_name)
-
 
 opioid_related_hospital_statistics %>% filter(hb_name %in% c("NHS Orkney", "NHS Shetland", "NHS Western Isles", "NHS Highland")) %>% view()
 
