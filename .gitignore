@@ -47,3 +47,6 @@ rsconnect/
 
 # data folder
 data
+
+# styling html
+styles.css

@@ -1,113 +1,312 @@
 ---
-title: "R Programming Formative Assignment"
-author: "Nicolas Martinez-Wise"
-date: ""
-output: html_document
+title: "Trends in Methadone and Buprenorphine Prescriptions and Opioid-Related Hospitalisations in Scotland (2017/18–2022/23)" 
+author: "B230838"
+date: "`r paste('Date last modified:', format(file.info('index.Rmd')$mtime, '%d %B %Y'))`"
+output:
+  html_document:
+        css: styles.css 
+        toc: true
+        toc_float: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warnings = FALSE)
-```
-
-# Research question: 
-What are the trends in the number of methadone prescriptions across health boards in Scotland between the financial years 2016/17 and 2022/23? How do these trends vary with the number of opioid-related hospital stays over the same period?
-
-- Opioid-related hospital stays are hospitalisations due to opioid overdose and opioid-related mental and behavioural disorders across general acute and psychiatric hospitals in Scotland. I will use the number of opioid-related hospital stays as an indicator of opioid addiction prevalence and severity in the population.
-- Methadone is a medication used in opioid substitution therapy (OST) to treat opioid addiction. I will use the number of methadone prescriptions as an indicator of the number of individuals receiving OST for opioid addiction. However, I understand that methadone is also used to treat chronic pain, so I will need to consider this when interpreting the results.
-
-- I expect that the number of methadone prescriptions will increase over time as the number of opioid-related hospital stays decreases. 
-
-
-```{r, include=FALSE}
-## NOTES: 
-#- An individual patient can have multiple hospital stays in a year across the two types of hospitals (general acute and psychiatric).
-
-## TO DO:
-#- Make a graph of the change in opioid-related hospital stays over time (from financial year 2016/17 to 2022/23) for each health board in Scotland.
-#- Download the population for each health board over time data at then in your graph do proportions of the population changes over time rather than the raw numbers.
-#- Do the big download thing (downloading multiple datasets at a time, shown to you in previous workshop) and then create function to concatenate all the monthly data into financial year data (think this is from April to April)
-#- Read this: https://www.gov.scot/publications/evidence-review-opioid-substitution-therapy-ost-implicated-deaths-prescribing-scotland/pages/2/
-#- This is the geospatial stuff, you were thinking of doing something like deviations from mean and the plotting it like red is increase and blue is decrease
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warnings = FALSE, eval = FALSE) 
+#tidy=TRUE,
 ```
 
 
+## Background
+Opioid addiction is a significant public health issue in Scotland, with opioid-related deaths more than doubling between 2011 and 2020<sup>[1](#ref1)</sup>. Methadone and buprenorphine are medications used in opioid substitution therapy to treat opioid addiction<sup>[2](#ref2)</sup>. The aims of OST are to reduce or stop opioid use, improve health and social functioning, and help patients avoid some of the more serious consequences of drug use. Treatment often lasts for several years but can sometimes be required throughout life<sup>[3](#ref3)</sup>.
 
-```{r, include=FALSE}
-library(tidyverse)
-library(here)
-library(janitor)
-library(sf)
+,
+
+with opioid-related hospitalisations being a key indicator of the prevalence and severity of opioid addiction in the population. The number of methadone and buprenorphine prescriptions can provide insights into the number of individuals receiving OST for opioid addiction. 
+
+Using freely available data from the Public Health Scotland website, this study explores the efficacy of OST by analysing the trends in methadone and buprenorphine prescriptions and their relationship to the number of opioid-related hospitalisations, as porportions of the population, between the financial years 2017/18 and 2022/23, and also explores how much OCT treatment is prescribed across Scottish health boards in the same period. 
+
+2023 is the most recent record for the drug-related hospital statstics
+
+Name each of the datasets you are using and describe what they contain
+
+either buprenorphine and naloxone combined (Suboxone) or buprenorphine
+
+Make sure u include the availability of data, only including 6 years because that’s the most recent available data.
+
+
+## Data Wrangling
+### Load Required Packages into the R Session
+```{r}
+lapply(c("tidyverse", "here", "janitor", "sf"), library, character.only = TRUE)
 ```
 
-```{r, include=FALSE}
-#Load NHS Scotland opioid-related hospital stays data.
+### Download Datasets Not Available as URLs
+1. Create a "data" folder in your working directory.
+2. Download the **Drug-Related Hospital Statistics** dataset:  
+   - Visit the [Drug-Related Hospital Statistics](https://publichealthscotland.scot/publications/drug-related-hospital-statistics/drug-related-hospital-statistics-scotland-2022-to-2023/data-explorer/) page.  
+   - Scroll to the **Dashboard** section and click the **Data** icon.
+   - Scroll down and click the **Download data** icon.  
+   - Save the downloaded file to your "data" folder.
+3. Download **Health Board Spatial Data**:  
+   - Visit the [Health Board Spatial Data](https://www.spatialdata.gov.scot/geonetwork/srv/eng/catalog.search#/metadata/f12c3826-4b4b-40e6-bf4f-77b9ed01dc14) page.  
+   - Scroll to the **Download** section and click the **Download** icon.  
+   - Save the downloaded folder to your "data" folder.
+#### Load datasets
 
-opioid_related_hospital_statistics <- read_csv(here("data", "opioid_related_hospital_statistics.csv")) %>%
-  # Clean column names for consistency
+
+Load the **Drug-Related Hospital Statistics**, **Health Board Geography Codes**, and **Health Board Population Estimates** datasets. 
+```{r}
+# Vector of the dataset filenames listed in the order above.
+dataset_filenames <- c("table_data.csv", "https://www.opendata.nhs.scot/dataset/9f942fdb-e59e-44f5-b534-d6e17229cc7b/resource/652ff726-e676-4a20-abda-435b98dd7bdc/download/hb14_hb19.csv", "https://www.opendata.nhs.scot/dataset/7f010430-6ce1-4813-b25c-f7f335bdc4dc/resource/27a72cc8-d6d8-430c-8b4f-3109a9ceadb1/download/hb2019_pop_est_14102024.csv")
+
+# Vector of desired names for the datasets to be assigned in the global environment.
+dataset_desired_names <- c("drug_related_hospital_statistics", "hb_names", "hb_population")
+
+# Function to read CSV files either from a URL (if the filename starts with 'https://') or from a local "data" folder, and return a dataframe with cleaned column names.
+read_csv_file <- function(filename) {
+  dataframe <- 
+    if (str_detect(filename, "^https://")) {read_csv(filename)}
+    else {read_csv(here("data", filename))}
+  dataframe %>% clean_names()
+  }
+
+dataset_filenames %>%
+  # Read each dataset from dataset_filenames using the read_csv_file function into a list of dataframes.
+  map(read_csv_file) %>% 
+  # Assign each dataframe in the list to the global environment with the corresponding name from dataset_desired_names - the walk2 function iterates over the list of dataframes (.x) and the names from dataset_desired_names (.y).
+  walk2(dataset_desired_names, ~ assign(.y, .x, envir = .GlobalEnv))
+```
+
+Load the **Health Board Spatial Data**.
+```{r, results = 'hide'}
+hb_spatial_data <- st_read(here("data", "SG_NHS_HealthBoards_2019", "SG_NHS_HealthBoards_2019.shp")) %>% 
   clean_names() %>% 
-  # Rename columns for clarity and consistency
-  rename(hb_name = location, overdose_hospital_stays = value) %>%
-  # Remove "NHS" prefix from every entry in the hb_name column (the health board names) for clarity and consistency
-  mutate(hb_name = str_replace(hb_name, "^NHS ", ""))
+  # Introduce the "NHS" prefix in the hb_name column for consistency across datasets.
+  mutate(hb_name = paste0("NHS ", hb_name))
 ```
 
-```{r, results = 'hide', include=FALSE}
-#Load NHS health board names and spatial data.
+Load and combine the **Prescriptions in the Community** datasets for all months between financial years 2017/18 and 2022/23, filtering specifically for methadone and buprenorphine prescriptions. The filtering step optimises the computation by narrowing down the dataset before further processing. Note, executing this code will take ~40 mins.
+```{r}
+# Read the URLs from the text file in the working directory into the vector prescription_data_urls.
+prescription_data_urls <- read_lines("prescriptions_in_the_community_urls.txt")
 
-healthboard_names_and_spatial_data <- st_read(here("data", "health_board_spatial_data", "NHS_healthboards_2019.shp")) %>%
-  clean_names() %>% 
-  # Rename column for clarity 
-  rename(hb_geometry = geometry) %>% 
-  # Change "and" to "&" in the health board names for consistency
-  mutate(hb_name = str_replace(hb_name, " and ", " & "))
+# Increase timeout to 120 seconds to allow large datasets to download (if you still experience timeout errors due to slow Wi-Fi, consider increasing this value further).
+options(timeout = 120)
+
+# For each URL, read in the dataset and filter for methadone and buprenorphine prescriptions. Combine the datasets, by rows, into a single dataframe.
+combined_prescription_data <- prescription_data_urls %>% 
+  map_dfr(~read_csv(.) %>% filter(str_detect(BNFItemDescription, "METHADONE|BUPRENORPHINE"))) %>% 
+  clean_names()
 ```
 
-```{r, include=FALSE}
-#Join together the opioid-related hospital stays data, health board names and spatial data, and health board population data.
+```{r, include = FALSE}
+# THIS IS QUICKER TO RUN THAN FROM URLS, SO KEEP ONCE KNOW THEY CREATE SAME COMBINED DATAFRAME
 
-
-joined <- opioid_related_hospital_statistics %>%
-  full_join(healthboard_names_and_spatial_data, join_by("hb_name")) %>%
-  # Select relevant columns
-  select(financial_year, hb_name, hb_code, drug_type, overdose_hospital_stays, hb_geometry)
+prescription_data_filenames <- list.files(here("data", "prescription_data"), pattern = "csv")
+ 
+combined_prescription_data <- prescription_data_filenames %>% 
+  map_dfr(~read_csv(here("data", "prescription_data", .)) %>% filter(str_detect(BNFItemDescription, "METHADONE|BUPRENORPHINE"))) %>% 
+  clean_names()
 ```
 
+### Processing datasets
+Extract data on opioid-related hospitalisations across NHS health boards for financial years 2017/18 to 2022/23 from the **Drug-Related Hospital Statistics** dataset. This includes hospital stays related to any diagnosis (overdoes or opioid-related mental and behavioural disorder) and in any hospital type (general acute or psychiatric), where admissions per patient in a year are counted as separate stays.
+```{r}
+opioid_related_hospitalsations <- drug_related_hospital_statistics %>%
+  # Filter to reflect the number of opioid-related hospitalisations as specified above.
+  filter(measure == "Number", drug_type == "Opioids", diagnosis_grouping == "Any diagnosis", hospital_type == "Any hospital type", activity_type == "Stays", location_type == "NHS Board of residence", financial_year >= "2017/18") %>% 
+  # Rename columns for clarity and consistency across datasets.
+  rename(number_of_stays = value, hb_name = location) %>% 
+  # Replace the "&" symbol with "and" in the hb_name column for consistency across datasets.
+  mutate(hb_name = str_replace(hb_name, " & ", " and "))
+```
 
-```{r visualization, echo=FALSE}
-#Visualise the number of opioid-related hospital stays, as a proportion of the health board population, over time for each health board in Scotland.
+Extract total population estimates for each health board from the **Health Board Population Estimates** dataset for 2017 to 2022. Since the **Drug-Related Hospital Statistics** dataset is organised by financial year and the **Health Board Population Estimates** dataset by calendar year, align the two by assigning each calendar year to its corresponding financial year using the provided code. This approach offers the most accurate approximation, as a financial year runs from April 6 of one year to April 5 of the next.
+```{r}
+hb_population <- hb_population %>%
+  # Filter to include data for years 2017 to 2022, where sex is 'All' (representing the total population), and exclude the entry for Scotland (health board code: S92000003).
+  filter(year %in% "2017":"2022", sex == "All", hb != "S92000003") %>% 
+  # Create a new column `financial_year` based on the `year` column. For each entry, the financial year is the current year followed by the last two digits of the following year.
+  mutate(financial_year = paste(year, year + 1 - 2000, sep = "/")) 
+```
 
-joined %>% 
-  ggplot(aes(fill = overdose_hospital_stays)) +
+Assign the corresponding financial year to each entry in the combined **Prescriptions in the Community** dataset. The reason for aligning to financial year rather than to calendar year is so that comparisons between NUMBER OF PRESCRIPTIONS and opioid-related hospitalisations are consistent.
+```{r}
+combined_prescription_data <- combined_prescription_data %>%
+  mutate(
+    # Convert the `paid_date_month` column from YYYYMM format to Date objects by appending "01" (to form a YYYYMMDD string) and using as.Date().
+    paid_date_month = as.Date(paste0(paid_date_month, "01"), format = "%Y%m%d"), 
+    # Create a new column `financial_year` based on the `paid_date_month` column. For months April (4) to December (12) the financial year is the current year followed by the last two digits of the following year, whereas January (1) to March (3) the financial year is the previous year followed by the last two digits of the current year.
+    financial_year = case_when(month(paid_date_month) >= 4 ~ paste(year(paid_date_month), year(paid_date_month) + 1 - 2000, sep = "/"), TRUE ~ paste(year(paid_date_month) - 1, year(paid_date_month) - 2000, sep = "/"))
+    )
+```
+
+The **Prescriptions in the Community** datasets spanning financial years 2017/18 to 2019/20 have inconsistent column names for health board codes: 'hbt' in some months and 'hbt2014' in others. This code checks that for each row, if one of these columns has a value, the other is NA. If this condition is met, the two columns are combined into one ('hb') to enable easy joining with other datasets based on health board code.
+```{r}
+all_good <- combined_prescription_data %>% 
+  # For each row, return TRUE if one of 'hbt' or 'hbt2014' is non-NA and the other is NA, otherwise return FALSE. Store the result in the new 'condition' column.
+  mutate(condition = if_else((!is.na(hbt) & is.na(hbt2014)) | (is.na(hbt) & !is.na(hbt2014)), TRUE, FALSE)) %>% 
+  # Confirm all values in 'condition' are TRUE - all() returns TRUE if this is the case.
+  summarise(check_condition = all(condition))
+
+# Execute the code below only if all_good is TRUE.
+if (all_good == TRUE) {
+    combined_prescription_data <- combined_prescription_data %>% 
+      # Create a new column 'hb' where for each row the value will be taken from 'hbt' unless it is NA, in which case it will take the value from 'hbt2014'.
+      mutate(hb = coalesce(hbt, hbt2014))
+    }
+```
+
+### Joining datasets
+Create a function to perform a left join between two datasets. 
+```{r}
+# Function to perform a left join between two datasets. Arguments taken are: the left dataset, the right dataset, the column to join by, and which columns from the right dataset to include in the result. 
+left_joining_function <- function(left_dataset, right_dataset, join_column, columns_from_right) {
+  left_dataset %>%
+    left_join(select(right_dataset, all_of(c(columns_from_right, join_column))), by = join_column)
+}
+```
+
+Join the filtered **Health Board Population Estimates** dataset and the combined **Prescriptions in the Community** dataset with the **Health Board Geography Codes** dataset. This enables joining by health board name as health board codes are inconsistent due to some being archived and new ones introduced.
+```{r}
+dataset_names <- list(hb_population, combined_prescription_data)
+
+population_and_prescription_joins <- map(dataset_names, ~ left_joining_function(..1, hb_names, "hb", "hb_name"))
+
+# Reassign the results of the joins to their respective variables.
+hb_population <- population_and_prescription_joins[[1]]
+combined_prescription_data <- population_and_prescription_joins[[2]]
+```
+
+Join the combined **Prescriptions in the Community** dataset with the filtered **Health Board Population Estimates**, the **Health Board Spatial Data** datasets, and the opioid-related hospitalisations data.
+```{r}
+# Tibble containing the arguments for each join, where each row defines the parameters for one join. 
+joining_arguments <- tibble(
+  right_dataset = list(hb_population, hb_spatial_data, opioid_related_hospitalsations),
+  join_column = list(c("hb_name", "financial_year"), "hb_name", c("hb_name", "financial_year")),
+  columns_from_right = list("all_ages", "geometry", "number_of_stays")
+  )
+
+# Sequentially apply the left_joining_function to join combined_prescription_data with each dataset in joining_arguments, row by row.
+for (i in seq(nrow(joining_arguments))) {
+  combined_prescription_data <- left_joining_function(
+    combined_prescription_data,
+    joining_arguments$right_dataset[[i]],
+    joining_arguments$join_column[[i]],
+    joining_arguments$columns_from_right[[i]]
+  )}
+```
+
+### Calculating Statistics
+Calculate the total number of methadone and buprenorphine prescriptions for each month and health board recorded in the combined **Prescriptions in the Community** dataset.
+```{r}
+methadone_buprenorphine_prescriptions <- combined_prescription_data %>%
+  group_by(paid_date_month, hb_name) %>%
+  # Sum the number_of_paid_items column for rows containing "METHADONE" or "BUPRENORPHINE" in the bnf_item_description column.
+  summarise(
+    quantity_methadone_prescription = sum(number_of_paid_items[str_detect(bnf_item_description, "METHADONE")]),
+    quantity_buprenorphine_prescription = sum(number_of_paid_items[str_detect(bnf_item_description, "BUPRENORPHINE")]),
+    # Retain the non-aggregated columns in the summarise() output by applying the first() function to the specified columns 
+    # as the columns are consistent within the grouping (ie: the values for these columns are the same across all rows in each group)
+    across(c(geometry, number_of_stays, all_ages, financial_year), first)
+)
+```
+
+Calculate the number of opioid-related hospitalisations and the number of prescriptions for each health board as a proportion of the total population for that health board per 1000.
+```{r}
+final_data <- methadone_buprenorphine_prescriptions %>%
+  mutate(
+    proportion_methadone_prescriptions_per_1000 = quantity_methadone_prescription / all_ages * 1000,
+    proportion_buprenorphine_prescriptions_per_1000 = quantity_buprenorphine_prescription / all_ages * 1000,
+    proportion_number_of_stays_per_1000 = number_of_stays / all_ages * 1000,
+    .keep = "unused"
+  )
+```
+
+GLM REGRESSION TO TEST CORRELATION BETWEEN YEAR PRESCRIPTION AND YEAR HOSPITALISATIONS, USING PROPORTIONS OF POPULATION (USE ACROSS FUNCTION) - MIGHT BE SIMPLER TO JUST DO METHADONE RATHER THAN BOTH (FOR WHOLE ANALYSIS)
+
+### Data Visualisation and Discussion 
+
+GRAPH ROUGH PLAN:
+- GRAPH SHOWING TRENDS IN PRESCRIPTION OVER TIME AT HIGH RESOLUTION, DO BY 3 MONTH CHUNKS ON LINE GRAPH 
+- GRAPH SHOWING COMPARISON IN YEARLY TRENDS ACROSS PRESCRIPTIONS AND OPIOID RELATED hospitalisations, DO FACET GIRD 3 ROWS 1 COLUMN OF LINE GRAPH 
+* Maybe create a table where you have the proportions of deaths due to opioid overdose, each year and then you use that extra thing were you colour the boxes in dependending on whether they increase or decrease from the year before (DO FOLD INCREASE OR DECREASE FROM THE PREVIOUS YEAR AS THE COLOUR) - THE OTHER TWO FIGURES, ONE HAS TO BE TABLE THE OTHER SPATIAL DATA MAP
+* ASK CHATGPT IF THERE IS A SPATIAL DATA MAP YOU CNA DO FULFILLING THESE IDEAS: (1) for the geospatial stuff, you were thinking of doing something like deviations from mean and the plotting it like red is increase and blue is decrease, (2) For the dual visualisation, prescription data for GP spatial data and opioid-related hopsital stays as NHS health board colour. => DO LIKE A CORRELATION TEST IN DIFFERENT COLOURS TO SHOW WHETHER INCREASED OR DECREASED OVER THE TIME PERIOD.
+
+```{r, ign}
+# create another column with the totals of prescriptions or stays for each year in scotland for graphs
+joined_data_means <- joined_data %>%
+  group_by(financial_year) %>%
+  summarise(methadone_prescriptions = sum(methadone_prescriptions), buprenorphine_prescriptions = sum(buprenorphine_prescriptions), number_of_stays = sum(number_of_stays))
+
+# Line graph faceted all 3
+joined_data_means %>%
+  pivot_longer(
+    cols = c(methadone_prescriptions, buprenorphine_prescriptions, number_of_stays),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  ggplot(aes(x = factor(financial_year, levels = unique(financial_year)), y = value, group = variable)) +
+  geom_line(aes(color = variable)) +
+  labs(
+    title = "Number of Methadone and Buprenorphine Prescriptions and Opioid-Related hospitalisations\nAcross Health Boards Over Time",
+    x = "Financial Year",
+    y = "Number of Prescriptions/Stays"
+  ) +
+  theme_minimal() +
+  facet_grid(variable ~., scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for clarity
+
+# looking at with-time changes more closely for prescription data 
+combined_prescription_data %>%
+  #filter(financial_year %in% c("2017/18", "2018/19")) %>% 
+  group_by(paid_date_month) %>%
+  summarise(methadone_prescriptions = sum(paid_quantity[grepl("METHADONE", bnf_item_description)]),
+            buprenorphine_prescriptions = sum(paid_quantity[grepl("BUPRENORPHINE", bnf_item_description)])) %>% 
+  ggplot(aes(x = paid_date_month, y = methadone_prescriptions)) +
+  geom_point() +
+  geom_line()
+
+
+
+
+
+
+joined_data %>% 
+  ggplot(aes(x = location, y = number_of_stays,fill = financial_year))
+
+
+joined_data %>% 
+  ggplot(aes(fill = opioid_hospital_stays)) +
   geom_sf(aes(geometry = hb_geometry)) +
   scale_fill_distiller(palette = "Spectral") +
-  labs(title = "Number of Opioid-Related Hospital Stays Across Health Boards\nOver Time") + 
+  labs(title = "Number of Opioid-Related hospitalisations Across Health Boards\nOver Time") + 
    theme_void() + 
   facet_wrap(~financial_year)
 ```
+This visualisation depicts the number of opioid-related hospitalisations, as a proportion of the health board population, over time for each health board in Scotland between the financial years 2017/18 and 2022/23. The visualisation shows that the number of opioid-related hospitalisations has varied across health boards and over time.
 
-This visualisation depicts the number of opioid-related hospital stays across health boards between the financial years 2016/17 and 2022/23. The visualisation shows that the number of opioid-related hospital stays has varied across health boards and over time.
+## Limitations 
+- I understand that methadone is also used to treat chronic pain, so I will need to consider this when interpreting the results.
+- The data for opioid-related hospitalisations is only available at the health board and the alcohol and drugs partnership (ADP) level. Unfortunately, I cannot join the ADP location data to the prescription data because there is no ADP -> council area data I can find. Additionally, although health and social care partnership (HSCP) areas overlap, they are not identical so I could not use this either. Ultimately, I could not look at trends across Scotland at a higher resolution even though they would have been more informative to describe trends across Scotland. - important that u mention this, include that u aslo couldnt do datazones (CHECK THE WEEK7 WORKSHOP YOU MISSED), note you think that they didnt include high granularity (datazones) in the drug stuff for ethical reasons - say that this prevented you looking at demographic as an effect because you couldnt get the granulairty eg for social deprivation statistics - these are the only geography types on Public Health Scotland Population estimates for all geography types in Scotland:• Data Zone (2011) from 2011 to 2021 • Intermediate Zone (2011) from 2011 to 2021 • Council Area (2019) from 1982 to 2023 • Health and Social Care Partnership (2019) from 1982 to 2023 • Health Board (2019) from 1981 to 2023
 
-# Next Steps:
-- I will calculcate proportions of the population when comparing across health boards and over time, rather than number used in the visualisation above. 
-- I will download the prescription data for financial years 2016/17 and 2022/23 and explore methadone prescription trends across health boards and over time. I will try to create a visualisation of how the number of methadone prescriptions and opioid-related hospital stays have changed over time for each health board, but I am not yet sure of the best way to visualise these datasets together.
-- I might separate opioid-related hospital stays into those due to overdose or mental and behavioural disorders. This could give a more in depth indication of how different manifestations of opioid addiction have changed across health boards and over time. I was wondering whether I could use this alongside some additional mental health data, but I am not sure how I would go about this.
-- I might also look at naloxalone and buprenorphine prescriptions in addition to methadone. This could give a better estimation of the number of individuals receiving treatment for opioid addiction.
-
-
-
+- Health Board nam : From 02-Feb 2018 there has been a minor boundary change to Keltybridge and Fife Environmental Energy Park at Westfield. From 01-Apr 2019 there has been a boundary change to Cardowan by Stepps. On both occasions, the affected Council Area, Health and Social Care Partnership and Health Board codes have been archived, and new codes introduced reflecting the new boundaries.
+- Prescription data from October 2018 is missing from NHS Tayside. The code below proves this: 
 ```{r, include = FALSE}
+# This code shows that the data from October 2018 (2018-10-01) is missing all the data from one health board 
+data_2018_10_01 <- read_csv(here("data", "prescription_data", "37e94a73-121e-443e-9564-2e1d9e36c5eb_october_2018_2019.csv")) %>% 
+  clean_names() 
 
-council_area <- read_csv(here("data", "council_area.csv"))
-
-table_data_3 <- read_csv(here("data", "table_data-3.csv"))
-
-
-opioid_related_hospital_statistics %>% 
-  ggplot(aes(x = financial_year, y = overdose_hospital_stays)) +
-  geom_boxplot() +
-  facet_wrap(~hb_name)
-
-opioid_related_hospital_statistics %>% filter(hb_name %in% c("NHS Orkney", "NHS Shetland", "NHS Western Isles", "NHS Highland")) %>% view()
-
+data_2018_10_01 %>% 
+  summarise(unique_hbt = unique(hbt)) %>% 
+  nrow()
+# The health board it is missing is S08000027 (2018 archived code) / S08000030 (2018 new code) which corresponds to the NHS Tayside healthboard
 ```
+- A limitation is that the analyses did not take into consideration the differences in the strengths of medication. Thus, interpreation of the results should be done with caution as the 'Total Quantity' does not account for the strength of the medication, which could reflect different medications strategies which would skew the results and which have significant implications on the state of the  
 
+## Acknolwedgements
+I used ChatGPT to better understand code from previous workshops, write functions for more complex tasks, and troubleshoot errors encountered while coding.
+
+## References
+1. <a id="ref1"></a> Markoulidakis, A., Hickman, M., McAuley, A., Barnsdale, L.R., Welton, N.J., Glancy, M., Shivaji, T., Collins, C., Lang, J., Femke de Wit, Hunt, G., Wilkinson, L., Fraser, R., Yeung, A., Horsburgh, K., Saket Priyadarshi, Hutchinson, S.J. and Jones, H.E. (2024). Prevalence of opioid dependence in Scotland 2015–2020: A multi‐parameter estimation of prevalence (MPEP) study. Addiction. doi:https://doi.org/10.1111/add.16500.
+2. <a id="ref2"></a> Department of Health (2017). Drug misuse and dependence UK guidelines on clinical management. [online] Available at: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/673978/clinical_guidelines_2017.pdf.  https://www.who.int/publications/i/item/9789241547543
+3. <a id="ref3"></a> World Health Organization (2009). Guidelines for the psychosocially assisted pharmacological treatment of opioid dependence. [online] www.who.int. Available at: https://www.who.int/publications/i/item/9789241547543
