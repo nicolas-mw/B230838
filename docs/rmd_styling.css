@@ -1,0 +1,130 @@
+/* justify the text */
+body, p {
+  text-align: justify;
+}
+
+/* make that long url break */
+a {
+  word-wrap: break-word;  /* Allows URLs in anchor tags to break */
+  word-break: break-word; /* Prevents URLs from overflowing */
+  overflow-wrap: break-word; /* Ensures long URLs wrap properly */
+}
+
+
+/* Center the title */
+h1 {
+  text-align: center;
+}
+
+/* Center the author */
+.author {
+  text-align: center;
+}
+
+/* Center the date */
+.date {
+  text-align: center;
+}
+
+/* Set background and text color for code */
+pre.r {
+  background-color: #F9F9F9 !important; /* Light grey background */
+  color: #000000 !important;            /* Black text for code */
+  font-family: Consolas, monospace !important; /* Monospaced font for code */
+  padding: 10px !important;
+  border-radius: 5px !important;
+}
+
+/* Set color for R comments */
+.hljs-comment {  /* Highlight.js class for comments */
+  color: #28A745 !important; /* Green color for comments */
+}
+
+/* Set color for R strings */
+.hljs-string {  /* Highlight.js class for strings */
+  color: #D6336C !important; /* Pinkish color for strings */
+}
+
+/* Set color for R functions and keywords */
+.hljs-keyword {  /* Highlight.js class for keywords */
+  color: #007BFF !important; /* Blue color for functions/keywords */
+}
+
+/* Set color for other elements like variables */
+.hljs-variable {  /* Highlight.js class for variables */
+  color: #6F42C1 !important; /* Purple color for variables */
+}
+
+/* Style the pipe symbol in the code blocks */
+pre code {
+  white-space: pre-wrap; /* Allow code to wrap properly */
+  word-wrap: break-word; /* Break words such as pipes */
+  overflow-wrap: break-word; /* Allow overflow wrap for long pipes */
+  word-break: break-word; /* Make sure words break correctly */
+  line-height: 1.3; /* Reduce line spacing to prevent gaps */
+}
+
+pre code span {
+  white-space: normal; /* Ensure pipes aren't treated as "justified" */
+}
+
+/* Prevent justification of code block */
+pre {
+  text-align: left !important; /* Align code to the left */
+}
+
+/* Decrease the headings font size */
+h1 {
+  font-size: 24px !important;  /* Use !important to ensure this is applied */
+}
+h2 {
+  font-size: 18px; /* Adjust size of subheadings */
+}
+h3 {
+  font-size: 16px; /* Adjust size of smaller subheadings */
+}
+h4 {
+  font-size: 14px; /* Adjust size for even smaller subheadings */
+}
+
+/* Decrease all text font size */
+body {
+  font-size: 12px;  /* Adjust this value to your preference */
+}
+
+/* Change font size for code blocks (R Markdown specific) */
+pre.r, pre.sourceCode {
+  font-size: 11px !important;  /* Adjust this value as needed */
+  font-family: inherit;  /* Keeps the default font family */
+}
+
+/* Change font size for inline code */
+code {
+  font-size: 11px !important;  /* Adjust this value as needed */
+  font-family: inherit;  /* Keeps the default font family */
+}
+
+/* Ensure collapsed TOC items are hidden by default */
+#toc ul {
+  display: none;
+}
+
+/* Show TOC items on hover */
+#toc li:hover > ul {
+  display: block !important;
+}
+
+/* Optional: If you want to keep the list expanded on hover, 
+   make sure the active list is shown */
+#toc li.toc_collapsed > ul {
+  display: block !important;
+}
+
+/* Make code chunks break across pages */
+pre, code {
+  page-break-inside: auto !important;
+}
+
+.sourceCode {
+  page-break-inside: auto !important;
+}
